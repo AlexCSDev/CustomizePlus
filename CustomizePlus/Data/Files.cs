@@ -5,53 +5,48 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-
 using ImGuiScene;
 
-namespace CustomizePlus.Data
+namespace CustomizePlus.Data;
+
+public static class Files
 {
-    public static class Files
+    private static readonly List<IDisposable>               LoadedResources = new();
+    private static readonly Dictionary<string, TextureWrap> TextureCache    = new();
+
+    public static TextureWrap Icon
+        => LoadImage("icon.png");
+
+    public static void Dispose()
     {
-        private static readonly List<IDisposable> LoadedResources = new();
-        private static readonly Dictionary<string, TextureWrap> TextureCache = new();
+        foreach (var resource in LoadedResources)
+            resource.Dispose();
 
-        public static TextureWrap Icon => LoadImage("icon.png");
+        LoadedResources.Clear();
+    }
 
-        public static void Dispose()
-        {
-            foreach (var resource in LoadedResources)
-            {
-                resource.Dispose();
-            }
+    private static TextureWrap LoadImage(string file)
+    {
+        if (TextureCache.TryGetValue(file, out var image))
+            return image;
 
-            LoadedResources.Clear();
-        }
+        var tex = DalamudServices.PluginInterface.UiBuilder.LoadImage(file);
+        LoadedResources.Add(tex);
+        TextureCache.Add(file, tex);
+        return tex;
+    }
 
-        private static TextureWrap LoadImage(string file)
-        {
-            if (TextureCache.TryGetValue(file, out var image))
-                return image;
+    private static string GetFullPath(string file)
+    {
+        var assemblyLocation = Assembly.GetExecutingAssembly().Location;
 
-            var tex = DalamudServices.PluginInterface.UiBuilder.LoadImage(file);
-            LoadedResources.Add(tex);
-            TextureCache.Add(file, tex);
-            return tex;
-        }
+        if (assemblyLocation == null)
+            throw new Exception("Failed to get executing assembly location");
 
-        private static string GetFullPath(string file)
-        {
-            var assemblyLocation = Assembly.GetExecutingAssembly().Location;
+        var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
 
-            if (assemblyLocation == null)
-            {
-                throw new Exception("Failed to get executing assembly location");
-            }
-
-            var assemblyDirectory = Path.GetDirectoryName(assemblyLocation);
-
-            return assemblyDirectory == null
-                ? throw new Exception("Failed to get executing assembly location")
-                : Path.Combine(assemblyDirectory, file);
-        }
+        return assemblyDirectory == null
+            ? throw new Exception("Failed to get executing assembly location")
+            : Path.Combine(assemblyDirectory, file);
     }
 }

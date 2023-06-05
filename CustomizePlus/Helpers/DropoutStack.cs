@@ -4,116 +4,103 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace CustomizePlus.Helpers
+namespace CustomizePlus.Helpers;
+
+/// <summary>
+///     Implements a stack with a bounded number of elements. Elements are deleted in
+///     FIFO order as stack size exceeds capacity.
+/// </summary>
+public sealed class DropoutStack<T> : IEnumerable<T>
 {
+    private readonly int _capacity;
+    private readonly T[] _memory;
+    private          int _bottom;
+    private          int _head;
+
     /// <summary>
-    ///     Implements a stack with a bounded number of elements. Elements are deleted in
-    ///     FIFO order as stack size exceeds capacity.
+    ///     Initializes a new instance of the <see cref="DropoutStack{T}" /> class.
     /// </summary>
-    public sealed class DropoutStack<T> : IEnumerable<T>
+    /// <param name="maxCapacity">The maximum capacity of the stack.</param>
+    public DropoutStack(int maxCapacity)
     {
-        private readonly int _capacity;
-        private readonly T[] _memory;
-        private int _bottom;
-        private int _head;
+        _memory   = new T[maxCapacity];
+        _capacity = maxCapacity;
+        _head     = 0;
+        _bottom   = 0;
+    }
 
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="DropoutStack{T}" /> class.
-        /// </summary>
-        /// <param name="maxCapacity">The maximum capacity of the stack.</param>
-        public DropoutStack(int maxCapacity)
+    public IEnumerator<T> GetEnumerator()
+        => IterateValuesLifo().GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator()
+        => GetEnumerator();
+
+    /// <summary>
+    ///     Push an element to the stack. If this causes the stack's size to exceed
+    ///     <see cref="_capacity" />, the stack's oldest item is deleted to make room.
+    /// </summary>
+    public void Push(T element)
+    {
+        _memory[_head] = element;
+        _head          = IncrementIndex(_head);
+
+        if (_head == _bottom)
+            _bottom = IncrementIndex(_bottom);
+    }
+
+    /// <summary>
+    ///     Try to pop an element from the stack and return whether the operation was
+    ///     successful. Sets <paramref name="value" /> is set to null if the stack is empty.
+    /// </summary>
+    public bool TryPop(out T? value)
+    {
+        if (_head == _bottom)
         {
-            _memory = new T[maxCapacity];
-            _capacity = maxCapacity;
-            _head = 0;
-            _bottom = 0;
+            value = default;
+            return false;
         }
 
-        public IEnumerator<T> GetEnumerator()
+        _head = DecrementIndex(_head);
+        value = _memory[_head];
+        return true;
+    }
+
+    /// <summary>
+    ///     Try to peek the top element of the stack and return whether the operation was
+    ///     successful. Sets <paramref name="value" /> is set to null if the stack is empty.
+    /// </summary>
+    public bool TryPeek(out T? value)
+    {
+        if (_head == _bottom)
         {
-            return IterateValuesLifo().GetEnumerator();
+            value = default;
+            return false;
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+        value = _memory[_head - 1];
+        return true;
+    }
 
-        /// <summary>
-        ///     Push an element to the stack. If this causes the stack's size to exceed
-        ///     <see cref="_capacity" />, the stack's oldest item is deleted to make room.
-        /// </summary>
-        public void Push(T element)
-        {
-            _memory[_head] = element;
-            _head = IncrementIndex(_head);
+    /// <summary>
+    ///     Empty the stack of all elements.
+    /// </summary>
+    public void Clear()
+    {
+        _head   = 0;
+        _bottom = 0;
+    }
 
-            if (_head == _bottom)
-            {
-                _bottom = IncrementIndex(_bottom);
-            }
-        }
+    private int IncrementIndex(int index)
+        => (index + 1) % _capacity;
 
-        /// <summary>
-        ///     Try to pop an element from the stack and return whether the operation was
-        ///     successful. Sets <paramref name="value" /> is set to null if the stack is empty.
-        /// </summary>
-        public bool TryPop(out T? value)
-        {
-            if (_head == _bottom)
-            {
-                value = default;
-                return false;
-            }
+    private int DecrementIndex(int index)
+        => index == 0
+            ? _capacity - 1
+            : index - 1;
 
-            _head = DecrementIndex(_head);
-            value = _memory[_head];
-            return true;
-        }
-
-        /// <summary>
-        ///     Try to peek the top element of the stack and return whether the operation was
-        ///     successful. Sets <paramref name="value" /> is set to null if the stack is empty.
-        /// </summary>
-        public bool TryPeek(out T? value)
-        {
-            if (_head == _bottom)
-            {
-                value = default;
-                return false;
-            }
-
-            value = _memory[_head - 1];
-            return true;
-        }
-
-        /// <summary>
-        ///     Empty the stack of all elements.
-        /// </summary>
-        public void Clear()
-        {
-            _head = 0;
-            _bottom = 0;
-        }
-
-        private int IncrementIndex(int index)
-        {
-            return (index + 1) % _capacity;
-        }
-
-        private int DecrementIndex(int index)
-        {
-            return index == 0
-                ? _capacity - 1
-                : index - 1;
-        }
-
-        private IEnumerable<T> IterateValuesLifo()
-        {
-            for (var iter = _head; iter != _bottom; iter = DecrementIndex(iter))
-            {
-                yield return _memory[iter];
-            }
-        }
+    private IEnumerable<T> IterateValuesLifo()
+    {
+        for (var iter = _head; iter != _bottom; iter = DecrementIndex(iter))
+            yield return _memory[iter];
     }
 }

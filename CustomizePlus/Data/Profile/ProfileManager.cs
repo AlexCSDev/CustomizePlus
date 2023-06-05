@@ -4,256 +4,234 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 using Dalamud.Game.ClientState.Objects.Enums;
 
-namespace CustomizePlus.Data.Profile
+namespace CustomizePlus.Data.Profile;
+
+/// <summary>
+///     Container class for administrating <see cref="CharacterProfile" />s during runtime.
+/// </summary>
+public class ProfileManager
 {
     /// <summary>
-    ///     Container class for administrating <see cref="CharacterProfile" />s during runtime.
+    ///     Config is loaded before the profile manager is necessarily instantiated.
+    ///     In the case that a legacy config needs to be converted, this container can
+    ///     hold any profiles parsed out of it because of its static nature.
     /// </summary>
-    public class ProfileManager
+    public static readonly HashSet<CharacterProfile> ConvertedProfiles = new();
+
+    private readonly Dictionary<ObjectKind, CharacterProfile> _defaultProfiles = new();
+
+    public readonly HashSet<CharacterProfile> Profiles = new(new ProfileEquality());
+
+    public readonly Dictionary<string, CharacterProfile> TempLocalProfiles = new();
+
+    //public readonly HashSet<CharacterProfile> ProfilesOpenInEditor = new(new ProfileEquality());
+    public CharacterProfile? ProfileOpenInEditor { get; private set; }
+
+    public void LoadProfiles()
     {
-        /// <summary>
-        ///     Config is loaded before the profile manager is necessarily instantiated.
-        ///     In the case that a legacy config needs to be converted, this container can
-        ///     hold any profiles parsed out of it because of its static nature.
-        /// </summary>
-        public static readonly HashSet<CharacterProfile> ConvertedProfiles = new();
-
-        private readonly Dictionary<ObjectKind, CharacterProfile> _defaultProfiles = new();
-
-        public readonly HashSet<CharacterProfile> Profiles = new(new ProfileEquality());
-
-        public readonly Dictionary<string, CharacterProfile> TempLocalProfiles = new();
-
-        //public readonly HashSet<CharacterProfile> ProfilesOpenInEditor = new(new ProfileEquality());
-        public CharacterProfile? ProfileOpenInEditor { get; private set; }
-
-        public void LoadProfiles()
+        foreach (var path in ProfileReaderWriter.GetProfilePaths())
         {
-            foreach (var path in ProfileReaderWriter.GetProfilePaths())
-            {
-                if (ProfileReaderWriter.TryLoadProfile(path, out var prof) && prof != null)
-                {
-                    PruneIdempotentTransforms(prof);
-
-                    Profiles.Add(prof);
-                    if (prof.Enabled)
-                    {
-                        AssertEnabledProfile(prof);
-                    }
-                }
-            }
-        }
-
-        public void CheckForNewProfiles()
-        {
-            foreach (var path in ProfileReaderWriter.GetProfilePaths())
-            {
-                if (ProfileReaderWriter.TryLoadProfile(path, out var prof)
-                    && prof != null
-                    && !Profiles.Contains(prof))
-                {
-                    PruneIdempotentTransforms(prof);
-
-                    Profiles.Add(prof);
-                }
-            }
-        }
-
-        /// <summary>
-        ///     Adds the given profile to the list of those managed, and immediately
-        ///     saves it to disk. If the profile already exists (and it is not forced to be new)
-        ///     the given profile will overwrite the old one.
-        /// </summary>
-        public void AddAndSaveProfile(CharacterProfile prof, bool forceNew = false)
-        {
-            PruneIdempotentTransforms(prof);
-
-            //if the profile is already in the list, simply replace it
-            if (!forceNew && Profiles.Remove(prof))
-            {
-                prof.ModifiedDate = DateTime.Now;
-                Profiles.Add(prof);
-                ProfileReaderWriter.SaveProfile(prof);
-            }
-            else
-            {
-                //otherwise it must be a new profile, obviously
-                //in which case we update its creation date
-                //(which incidentally prevents it from inheriting a hash code)
-                //and add it to the list of managed profiles
-
-                prof.CreationDate = DateTime.Now;
-                prof.ModifiedDate = DateTime.Now;
-
-                //only let this new profile be enabled if
-                // (1) it wants to be in the first place
-                // (2) the character it's for doesn't already have an enabled profile
-                prof.Enabled = prof.Enabled && !GetEnabledProfiles().Any(x => x.CharacterName == prof.CharacterName);
-
-                Profiles.Add(prof);
-                ProfileReaderWriter.SaveProfile(prof);
-            }
-        }
-
-        public void DeleteProfile(CharacterProfile prof)
-        {
-            if (Profiles.Remove(prof))
-            {
-                ProfileReaderWriter.DeleteProfile(prof);
-            }
-        }
-
-        /// <summary>
-        ///     Direct the manager to save every managed profile to disk.
-        /// </summary>
-        public void SaveAllProfiles()
-        {
-            foreach (var prof in Profiles)
+            if (ProfileReaderWriter.TryLoadProfile(path, out var prof) && prof != null)
             {
                 PruneIdempotentTransforms(prof);
 
-                ProfileReaderWriter.SaveProfile(prof);
+                Profiles.Add(prof);
+                if (prof.Enabled)
+                    AssertEnabledProfile(prof);
             }
         }
+    }
 
-        public void AssertEnabledProfile(CharacterProfile activeProfile)
+    public void CheckForNewProfiles()
+    {
+        foreach (var path in ProfileReaderWriter.GetProfilePaths())
         {
-            activeProfile.Enabled = true;
-
-            foreach (var profile in Profiles
-                         .Where(x => x.CharacterName == activeProfile.CharacterName && x != activeProfile))
+            if (ProfileReaderWriter.TryLoadProfile(path, out var prof)
+             && prof != null
+             && !Profiles.Contains(prof))
             {
-                profile.Enabled = false;
+                PruneIdempotentTransforms(prof);
+
+                Profiles.Add(prof);
             }
         }
+    }
 
-        /// <summary>
-        ///     Mark the given profile (if any) as currently being edited, and return
-        ///     a copy that can be safely mangled without affecting the old one.
-        /// </summary>
-        public bool GetWorkingCopy(CharacterProfile prof, out CharacterProfile? copy)
+    /// <summary>
+    ///     Adds the given profile to the list of those managed, and immediately
+    ///     saves it to disk. If the profile already exists (and it is not forced to be new)
+    ///     the given profile will overwrite the old one.
+    /// </summary>
+    public void AddAndSaveProfile(CharacterProfile prof, bool forceNew = false)
+    {
+        PruneIdempotentTransforms(prof);
+
+        //if the profile is already in the list, simply replace it
+        if (!forceNew && Profiles.Remove(prof))
         {
-            if (prof != null && ProfileOpenInEditor != prof)
-            {
-                copy = new CharacterProfile(prof);
+            prof.ModifiedDate = DateTime.Now;
+            Profiles.Add(prof);
+            ProfileReaderWriter.SaveProfile(prof);
+        }
+        else
+        {
+            //otherwise it must be a new profile, obviously
+            //in which case we update its creation date
+            //(which incidentally prevents it from inheriting a hash code)
+            //and add it to the list of managed profiles
 
-                PruneIdempotentTransforms(copy);
-                ProfileOpenInEditor = copy;
-                return true;
-            }
+            prof.CreationDate = DateTime.Now;
+            prof.ModifiedDate = DateTime.Now;
 
-            copy = null;
-            return false;
+            //only let this new profile be enabled if
+            // (1) it wants to be in the first place
+            // (2) the character it's for doesn't already have an enabled profile
+            prof.Enabled = prof.Enabled && !GetEnabledProfiles().Any(x => x.CharacterName == prof.CharacterName);
+
+            Profiles.Add(prof);
+            ProfileReaderWriter.SaveProfile(prof);
+        }
+    }
+
+    public void DeleteProfile(CharacterProfile prof)
+    {
+        if (Profiles.Remove(prof))
+            ProfileReaderWriter.DeleteProfile(prof);
+    }
+
+    /// <summary>
+    ///     Direct the manager to save every managed profile to disk.
+    /// </summary>
+    public void SaveAllProfiles()
+    {
+        foreach (var prof in Profiles)
+        {
+            PruneIdempotentTransforms(prof);
+
+            ProfileReaderWriter.SaveProfile(prof);
+        }
+    }
+
+    public void AssertEnabledProfile(CharacterProfile activeProfile)
+    {
+        activeProfile.Enabled = true;
+
+        foreach (var profile in Profiles
+                     .Where(x => x.CharacterName == activeProfile.CharacterName && x != activeProfile))
+            profile.Enabled = false;
+    }
+
+    /// <summary>
+    ///     Mark the given profile (if any) as currently being edited, and return
+    ///     a copy that can be safely mangled without affecting the old one.
+    /// </summary>
+    public bool GetWorkingCopy(CharacterProfile prof, out CharacterProfile? copy)
+    {
+        if (prof != null && ProfileOpenInEditor != prof)
+        {
+            copy = new CharacterProfile(prof);
+
+            PruneIdempotentTransforms(copy);
+            ProfileOpenInEditor = copy;
+            return true;
         }
 
-        public void SaveWorkingCopy(CharacterProfile prof, bool editingComplete = false)
-        {
-            if (ProfileOpenInEditor == prof)
-            {
-                AddAndSaveProfile(prof);
+        copy = null;
+        return false;
+    }
 
-                if (editingComplete)
-                {
-                    StopEditing(prof);
-                }
-            }
+    public void SaveWorkingCopy(CharacterProfile prof, bool editingComplete = false)
+    {
+        if (ProfileOpenInEditor == prof)
+        {
+            AddAndSaveProfile(prof);
+
+            if (editingComplete)
+                StopEditing(prof);
         }
+    }
 
-        public void RevertWorkingCopy(CharacterProfile prof)
-        {
-            var original = GetProfileByUniqueId(prof.UniqueId);
+    public void RevertWorkingCopy(CharacterProfile prof)
+    {
+        var original = GetProfileByUniqueId(prof.UniqueId);
 
-            if (original != null
-                && Profiles.Contains(prof)
-                && ProfileOpenInEditor == prof)
-            {
-                foreach (var kvp in prof.Bones)
-                {
-                    if (original.Bones.TryGetValue(kvp.Key, out var bt) && bt != null)
-                    {
-                        prof.Bones[kvp.Key].UpdateToMatch(bt);
-                    }
-                    else
-                    {
-                        prof.Bones.Remove(kvp.Key);
-                    }
-                }
-            }
-        }
-
-        public void StopEditing(CharacterProfile prof)
-        {
-            ProfileOpenInEditor = null;
-        }
-
-        public void AddTemporaryProfile(string characterName, CharacterProfile prof)
-        {
-            TempLocalProfiles[characterName] = prof;
-        }
-
-        public void RemoveTemporaryProfile(string characterName)
-        {
-            TempLocalProfiles.Remove(characterName);
-        }
-
-        public static void PruneIdempotentTransforms(CharacterProfile prof)
-        {
+        if (original != null
+         && Profiles.Contains(prof)
+         && ProfileOpenInEditor == prof)
             foreach (var kvp in prof.Bones)
             {
-                if (!kvp.Value.IsEdited())
-                {
+                if (original.Bones.TryGetValue(kvp.Key, out var bt) && bt != null)
+                    prof.Bones[kvp.Key].UpdateToMatch(bt);
+                else
                     prof.Bones.Remove(kvp.Key);
-                }
             }
-        }
-
-        public void ProcessConvertedProfiles()
-        {
-            foreach (var prof in ConvertedProfiles)
-            {
-                if (ConvertedProfiles.Remove(prof))
-                {
-                    AddAndSaveProfile(prof);
-                }
-            }
-        }
-
-        /// <summary>
-        ///     Return a list of managed profiles the user has indicated should be rendered.
-        /// </summary>
-        public CharacterProfile[] GetEnabledProfiles()
-        {
-            //if a profile is being edited it's defacto considered disabled
-            var enabledProfiles = Profiles.Where(x => x.Enabled && x.UniqueId != (ProfileOpenInEditor?.UniqueId ?? 0));
-
-            //add any temp profiles from mare
-            enabledProfiles = enabledProfiles.Concat(TempLocalProfiles.Values);
-
-            //add any being-edited profiles that are enabled, though
-            if (ProfileOpenInEditor?.Enabled ?? false)
-            {
-                enabledProfiles = enabledProfiles.Append(ProfileOpenInEditor);
-            }
-
-            return enabledProfiles.ToArray();
-        }
-
-        public CharacterProfile? GetProfileByCharacterName(string name)
-        {
-            return Profiles.FirstOrDefault(x => x.CharacterName == name);
-        }
-
-        public CharacterProfile? GetProfileByUniqueId(int id)
-        {
-            return Profiles.FirstOrDefault(x => x.UniqueId == id);
-        }
-
-        //public void UpdateDefaults(ObjectKind kind, CharacterProfile prof)
-        //{
-        //	this.defaultProfiles[kind] = prof;
-        //}
     }
+
+    public void StopEditing(CharacterProfile prof)
+    {
+        ProfileOpenInEditor = null;
+    }
+
+    public void AddTemporaryProfile(string characterName, CharacterProfile prof)
+    {
+        TempLocalProfiles[characterName] = prof;
+    }
+
+    public void RemoveTemporaryProfile(string characterName)
+    {
+        TempLocalProfiles.Remove(characterName);
+    }
+
+    public static void PruneIdempotentTransforms(CharacterProfile prof)
+    {
+        foreach (var kvp in prof.Bones)
+        {
+            if (!kvp.Value.IsEdited())
+                prof.Bones.Remove(kvp.Key);
+        }
+    }
+
+    public void ProcessConvertedProfiles()
+    {
+        foreach (var prof in ConvertedProfiles)
+        {
+            if (ConvertedProfiles.Remove(prof))
+                AddAndSaveProfile(prof);
+        }
+    }
+
+    /// <summary>
+    ///     Return a list of managed profiles the user has indicated should be rendered.
+    /// </summary>
+    public CharacterProfile[] GetEnabledProfiles()
+    {
+        //if a profile is being edited it's defacto considered disabled
+        var enabledProfiles = Profiles.Where(x => x.Enabled && x.UniqueId != (ProfileOpenInEditor?.UniqueId ?? 0));
+
+        //add any temp profiles from mare
+        enabledProfiles = enabledProfiles.Concat(TempLocalProfiles.Values);
+
+        //add any being-edited profiles that are enabled, though
+        if (ProfileOpenInEditor?.Enabled ?? false)
+            enabledProfiles = enabledProfiles.Append(ProfileOpenInEditor);
+
+        return enabledProfiles.ToArray();
+    }
+
+    public CharacterProfile? GetProfileByCharacterName(string name)
+    {
+        return Profiles.FirstOrDefault(x => x.CharacterName == name);
+    }
+
+    public CharacterProfile? GetProfileByUniqueId(int id)
+    {
+        return Profiles.FirstOrDefault(x => x.UniqueId == id);
+    }
+
+    //public void UpdateDefaults(ObjectKind kind, CharacterProfile prof)
+    //{
+    //	this.defaultProfiles[kind] = prof;
+    //}
 }

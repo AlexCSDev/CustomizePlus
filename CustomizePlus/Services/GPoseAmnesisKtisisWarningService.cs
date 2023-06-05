@@ -2,37 +2,33 @@
 // Licensed under the MIT license.
 
 using System.Numerics;
-
 using CustomizePlus.Core;
 using CustomizePlus.UI.Dialogs;
 
-namespace CustomizePlus.Services
+namespace CustomizePlus.Services;
+
+internal class GPoseAmnesisKtisisWarningService : ServiceBase<GPoseAmnesisKtisisWarningService>
 {
-    internal class GPoseAmnesisKtisisWarningService : ServiceBase<GPoseAmnesisKtisisWarningService>
+    public override void Start()
     {
-        public override void Start()
-        {
-            GPoseService.Instance.OnGPoseStateChange += OnGPoseStateChange;
-            base.Start();
-        }
+        GPoseService.Instance.OnGPoseStateChange += OnGPoseStateChange;
+        base.Start();
+    }
 
-        private void OnGPoseStateChange(GPoseState gposeState)
-        {
-            if (gposeState != GPoseState.Inside)
-            {
-                return;
-            }
+    private void OnGPoseStateChange(GPoseState gposeState)
+    {
+        if (gposeState != GPoseState.Inside)
+            return;
 
-            MessageDialog.Show(
-                "Several Customize+ features are not compatible with Anamnesis and Ktisis, namely bone position and rotation offsets.\n" +
-                "If you are using Anamnesis, Customize+ will automatically disable them for you when needed.\n" +
-                "If you are using Ktisis you will need to create separate body scale without position and rotation offsets to be used in GPose.",
-                new Vector2(715, 125), null, "ana_ktisis_gpose_pos_rot_warning");
-        }
+        MessageDialog.Show(
+            "Several Customize+ features are not compatible with Anamnesis and Ktisis, namely bone position and rotation offsets.\n"
+          + "If you are using Anamnesis, Customize+ will automatically disable them for you when needed.\n"
+          + "If you are using Ktisis you will need to create separate body scale without position and rotation offsets to be used in GPose.",
+            new Vector2(715, 125), null, "ana_ktisis_gpose_pos_rot_warning");
+    }
 
-        public override void Dispose()
-        {
-            GPoseService.Instance.OnGPoseStateChange -= OnGPoseStateChange;
-        }
+    public override void Dispose()
+    {
+        GPoseService.Instance.OnGPoseStateChange -= OnGPoseStateChange;
     }
 }

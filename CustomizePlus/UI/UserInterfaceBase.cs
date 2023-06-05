@@ -3,52 +3,53 @@
 
 using System;
 
-namespace CustomizePlus.UI
+namespace CustomizePlus.UI;
+
+public abstract class UserInterfaceBase : IDisposable
 {
-    public abstract class UserInterfaceBase : IDisposable
+    public bool IsOpen { get; private set; }
+
+    protected int Index { get; private set; }
+
+    protected UserInterfaceManager Manager
+        => Plugin.InterfaceManager;
+
+    protected virtual bool SingleInstance
+        => false;
+
+    public virtual void Dispose()
+    { }
+
+    public virtual void Open()
     {
-        public bool IsOpen { get; private set; }
-
-        protected int Index { get; private set; }
-        protected UserInterfaceManager Manager => Plugin.InterfaceManager;
-
-        protected virtual bool SingleInstance => false;
-
-        public virtual void Dispose()
+        if (SingleInstance)
         {
-        }
-
-        public virtual void Open()
-        {
-            if (SingleInstance)
+            var instance = Manager.GetUserInterface(GetType());
+            if (instance != null)
             {
-                var instance = Manager.GetUserInterface(GetType());
-                if (instance != null)
-                {
-                    instance?.Focus();
-                    return;
-                }
+                instance?.Focus();
+                return;
             }
-
-            IsOpen = true;
         }
 
-        public virtual void Focus()
-        {
-            // ??
-        }
+        IsOpen = true;
+    }
 
-        public abstract void Draw();
+    public virtual void Focus()
+    {
+        // ??
+    }
 
-        public virtual void Close()
-        {
-            IsOpen = false;
-        }
+    public abstract void Draw();
 
-        internal void DoDraw(int index)
-        {
-            Index = index;
-            Draw();
-        }
+    public virtual void Close()
+    {
+        IsOpen = false;
+    }
+
+    internal void DoDraw(int index)
+    {
+        Index = index;
+        Draw();
     }
 }

@@ -9,47 +9,46 @@ using Dalamud.Game.Gui;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 
-namespace CustomizePlus
+namespace CustomizePlus;
+
+public class DalamudServices
 {
-    public class DalamudServices
+    [PluginService]
+    public static Framework Framework { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static ObjectTable ObjectTable { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static DalamudPluginInterface PluginInterface { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static CommandManager CommandManager { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static ChatGui ChatGui { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static ClientState ClientState { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static SigScanner SigScanner { get; private set; } = null!;
+
+    [PluginService]
+    [RequiredVersion("1.0")]
+    public static GameGui GameGui { get; private set; } = null!;
+
+    public static void Initialize(DalamudPluginInterface pluginInterface)
     {
-        [PluginService] public static Framework Framework { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static ObjectTable ObjectTable { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static DalamudPluginInterface PluginInterface { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static CommandManager CommandManager { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static ChatGui ChatGui { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static ClientState ClientState { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static SigScanner SigScanner { get; private set; } = null!;
-
-        [PluginService]
-        [RequiredVersion("1.0")]
-        public static GameGui GameGui { get; private set; } = null!;
-
-        public static void Initialize(DalamudPluginInterface pluginInterface)
-        {
-            pluginInterface.Create<DalamudServices>();
-        }
-
-        public static void Destroy()
-        {
-        }
+        pluginInterface.Create<DalamudServices>();
     }
+
+    public static void Destroy()
+    { }
 }

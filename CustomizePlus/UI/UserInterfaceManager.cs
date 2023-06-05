@@ -4,101 +4,90 @@
 using System;
 using System.Collections.Generic;
 
-namespace CustomizePlus.UI
+namespace CustomizePlus.UI;
+
+public class UserInterfaceManager : IDisposable
 {
-    public class UserInterfaceManager : IDisposable
+    private readonly List<UserInterfaceBase> _interfaces = new();
+
+    public void Dispose()
     {
-        private readonly List<UserInterfaceBase> _interfaces = new();
-
-        public void Dispose()
+        foreach (var iface in _interfaces)
         {
-            foreach (var iface in _interfaces)
-            {
-                iface.Close();
-                iface.Dispose();
-            }
-
-            _interfaces.Clear();
+            iface.Close();
+            iface.Dispose();
         }
 
-        public void Draw()
+        _interfaces.Clear();
+    }
+
+    public void Draw()
+    {
+        if (_interfaces.Count <= 0)
+            return;
+
+        for (var i = _interfaces.Count - 1; i >= 0; i--)
         {
-            if (_interfaces.Count <= 0)
+            _interfaces[i].DoDraw(i);
+
+            if (!_interfaces[i].IsOpen)
             {
-                return;
+                _interfaces[i].Dispose();
+                _interfaces.RemoveAt(i);
             }
+        }
+    }
 
-            for (var i = _interfaces.Count - 1; i >= 0; i--)
+    public T Show<T>()
+        where T : UserInterfaceBase
+    {
+        //todo: do not allow more than a single instance of the same window?
+        var ui = Activator.CreateInstance<T>();
+        ui.Open();
+
+        if (ui.IsOpen)
+            _interfaces.Add(ui);
+
+        return ui;
+    }
+
+    // Added this so you can close with /customize. This may need a rework in the future to access the broader usecase of the rest of the methods. But this should serve for now?
+    public void Toggle<T>()
+        where T : UserInterfaceBase, new()
+    {
+        if (_interfaces.Count <= 0)
+            new InvalidOperationException("Interfaces is empty.");
+
+        // Close all windows, if we closed any window set 'switchedOff' to true so we know we are hiding interfaces.
+        // If we did not turn anything off, we probably want to show our window.
+        if (!CloseAllUserInterfaces())
+            Show<T>();
+    }
+
+    // Closes all Interfaces, returns true if at least one Interface was closed.
+    public bool CloseAllUserInterfaces()
+    {
+        var interfaceWasClosed = false;
+        foreach (var currentInterface in _interfaces)
+        {
+            if (currentInterface.IsOpen)
             {
-                _interfaces[i].DoDraw(i);
-
-                if (!_interfaces[i].IsOpen)
-                {
-                    _interfaces[i].Dispose();
-                    _interfaces.RemoveAt(i);
-                }
+                currentInterface.Close();
+                interfaceWasClosed = true;
             }
         }
 
-        public T Show<T>()
-            where T : UserInterfaceBase
+        return interfaceWasClosed;
+    }
+
+    public UserInterfaceBase? GetUserInterface(Type type)
+    {
+        foreach (var ui in _interfaces)
         {
-            //todo: do not allow more than a single instance of the same window?
-            var ui = Activator.CreateInstance<T>();
-            ui.Open();
-
-            if (ui.IsOpen)
-            {
-                _interfaces.Add(ui);
-            }
-
-            return ui;
+            if (ui.GetType().IsAssignableTo(type))
+                return ui;
         }
 
-        // Added this so you can close with /customize. This may need a rework in the future to access the broader usecase of the rest of the methods. But this should serve for now?
-        public void Toggle<T>()
-            where T : UserInterfaceBase, new()
-        {
-            if (_interfaces.Count <= 0)
-            {
-                new InvalidOperationException("Interfaces is empty.");
-            }
-
-            // Close all windows, if we closed any window set 'switchedOff' to true so we know we are hiding interfaces.
-            // If we did not turn anything off, we probably want to show our window.
-            if (!CloseAllUserInterfaces())
-            {
-                Show<T>();
-            }
-        }
-
-        // Closes all Interfaces, returns true if at least one Interface was closed.
-        public bool CloseAllUserInterfaces()
-        {
-            var interfaceWasClosed = false;
-            foreach (var currentInterface in _interfaces)
-            {
-                if (currentInterface.IsOpen)
-                {
-                    currentInterface.Close();
-                    interfaceWasClosed = true;
-                }
-            }
-
-            return interfaceWasClosed;
-        }
-
-        public UserInterfaceBase? GetUserInterface(Type type)
-        {
-            foreach (var ui in _interfaces)
-            {
-                if (ui.GetType().IsAssignableTo(type))
-                {
-                    return ui;
-                }
-            }
-
-            return null;
-        }
+        return null;
     }
 }

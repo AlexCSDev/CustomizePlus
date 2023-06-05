@@ -3,15 +3,14 @@
 
 using System;
 
-namespace CustomizePlus.Core
+namespace CustomizePlus.Core;
+
+//Borrowed from Brio
+internal interface IService : IDisposable
 {
-    //Borrowed from Brio
-    internal interface IService : IDisposable
-    {
-        void AssignInstance();
-        void ClearInstance();
-        void Start();
-        void Tick(float delta);
-        void Stop();
-    }
+    void AssignInstance();
+    void ClearInstance();
+    void Start();
+    void Tick(float delta);
+    void Stop();
 }

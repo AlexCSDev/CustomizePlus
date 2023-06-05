@@ -1,11 +1,10 @@
 ﻿// © Customize+.
 // Licensed under the MIT license.
 
-namespace CustomizePlus.Data.Configuration.Interfaces
+namespace CustomizePlus.Data.Configuration.Interfaces;
+
+internal interface ILegacyConfiguration
 {
-    internal interface ILegacyConfiguration
-    {
-        ILegacyConfiguration? LoadFromFile(string path);
-        PluginConfiguration ConvertToLatestVersion();
-    }
+    ILegacyConfiguration? LoadFromFile(string path);
+    PluginConfiguration   ConvertToLatestVersion();
 }
